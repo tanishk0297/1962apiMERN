@@ -58,6 +58,90 @@ router.get('/date', async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 });
+// Backend: Update the /date-range route
+router.get('/date-range', async (req, res) => {
+    const { fromDate, toDate } = req.query;
+
+    try {
+        if (!fromDate || !toDate) {
+            return res.status(400).json({ message: 'Both fromDate and toDate are required' });
+        }
+
+        const startOfFromDate = new Date(new Date(fromDate).setHours(0, 0, 0, 0));
+        const endOfToDate = new Date(new Date(toDate).setHours(23, 59, 59, 999));
+
+        const consolidatedData = await Ticket.aggregate([
+            { $match: { date: { $gte: startOfFromDate, $lte: endOfToDate } } },
+            { 
+                $group: {
+                    _id: "$carNumber",
+                    totalNewTickets: { $sum: "$newTicket" },
+                    totalPendingTickets: { $sum: "$pendingTicket" },
+                    totalAttendedTickets: { $sum: "$attendedTicket" },
+                    totalCancelledTickets: { $sum: "$cancelledTicket" },
+                    totalCollected: { $sum: "$collected" },
+                    totalToDeposit: { $sum: "$toBeDeposited" },
+                    
+                    // Aggregating attendance data
+                    doctorPresent: { $sum: { $cond: [{ $eq: ["$doctorAttendance", "present"] }, 1, 0] } },
+                    doctorAbsent: { $sum: { $cond: [{ $eq: ["$doctorAttendance", "absent"] }, 1, 0] } },
+                    doctorLeave: { $sum: { $cond: [{ $eq: ["$doctorAttendance", "leave"] }, 1, 0] } },
+                    doctorWL: { $sum: { $cond: [{ $eq: ["$doctorAttendance", "WL"] }, 1, 0] } },
+                    doctorLH: { $sum: { $cond: [{ $eq: ["$doctorAttendance", "LH"] }, 1, 0] } },
+
+                    assistantPresent: { $sum: { $cond: [{ $eq: ["$assistantAttendance", "present"] }, 1, 0] } },
+                    assistantAbsent: { $sum: { $cond: [{ $eq: ["$assistantAttendance", "absent"] }, 1, 0] } },
+                    assistantLeave: { $sum: { $cond: [{ $eq: ["$assistantAttendance", "leave"] }, 1, 0] } },
+                    assistantWL: { $sum: { $cond: [{ $eq: ["$assistantAttendance", "WL"] }, 1, 0] } },
+                    assistantLH: { $sum: { $cond: [{ $eq: ["$assistantAttendance", "LH"] }, 1, 0] } },
+
+                    driverPresent: { $sum: { $cond: [{ $eq: ["$driverAttendance", "present"] }, 1, 0] } },
+                    driverAbsent: { $sum: { $cond: [{ $eq: ["$driverAttendance", "absent"] }, 1, 0] } },
+                    driverLeave: { $sum: { $cond: [{ $eq: ["$driverAttendance", "leave"] }, 1, 0] } },
+                    driverWL: { $sum: { $cond: [{ $eq: ["$driverAttendance", "WL"] }, 1, 0] } },
+                    driverLH: { $sum: { $cond: [{ $eq: ["$driverAttendance", "LH"] }, 1, 0] } },
+                }
+            },
+            {
+                $project: {
+                    carNumber: "$_id",
+                    totalNewTickets: 1,
+                    totalPendingTickets: 1,
+                    totalAttendedTickets: 1,
+                    totalCancelledTickets: 1,
+                    totalCollected: 1,
+                    totalToDeposit: 1,
+                    
+                    doctorPresent: 1,
+                    doctorAbsent: 1,
+                    doctorLeave: 1,
+                    doctorWL: 1,
+                    doctorLH: 1,
+
+                    assistantPresent: 1,
+                    assistantAbsent: 1,
+                    assistantLeave: 1,
+                    assistantWL: 1,
+                    assistantLH: 1,
+
+                    driverPresent: 1,
+                    driverAbsent: 1,
+                    driverLeave: 1,
+                    driverWL: 1,
+                    driverLH: 1,
+                }
+            }
+        ]);
+
+        res.status(200).json(consolidatedData);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+
+
+
 
 // Get a ticket by ID
 router.get('/:id', async (req, res) => {
